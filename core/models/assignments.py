@@ -1,7 +1,7 @@
 import enum
 from core import db
 from core.apis.decorators import Principal
-from core.libs import helpers, assertions
+from core.libs import helpers, assertions 
 from core.models.teachers import Teacher
 from core.models.students import Student
 from sqlalchemy.types import Enum as BaseEnum
@@ -64,8 +64,9 @@ class Assignment(db.Model):
         assignment = Assignment.get_by_id(_id)
         assertions.assert_found(assignment, 'No assignment with this id was found')
         assertions.assert_valid(assignment.student_id == principal.student_id, 'This assignment belongs to some other student')
+        assertions.assert_valid(assignment.state == AssignmentStateEnum.DRAFT,'only a draft assignment can be submitted')
         assertions.assert_valid(assignment.content is not None, 'assignment with empty content cannot be submitted')
-
+        
         assignment.teacher_id = teacher_id
         assignment.state = AssignmentStateEnum.SUBMITTED
         db.session.flush()
@@ -75,3 +76,20 @@ class Assignment(db.Model):
     @classmethod
     def get_assignments_by_student(cls, student_id):
         return cls.filter(cls.student_id == student_id).all()
+    
+    @classmethod
+    def get_assignments_by_teacher(cls, teacher_id):
+        return cls.filter(cls.teacher_id == teacher_id).all()
+
+    @classmethod
+    def grade_it(cls,_id,grades, principal: Principal):
+        assignment = Assignment.get_by_id(_id)
+        assertions.assert_found(assignment, 'No assignment with this id was found')
+        assertions.assert_valid(assignment.teacher_id == principal.teacher_id, f"This assignment is submitted to {principal.teacher_id} and not teacher {assignment.teacher_id}")
+        assertions.assert_grades(grades in GradeEnum.__members__.values(), 'Bad Grades please give valid grades')
+        
+        assignment.grade = grades
+        assignment.state = AssignmentStateEnum.GRADED
+        db.session.flush()
+
+        return assignment
